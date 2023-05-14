@@ -32,7 +32,7 @@
 #include "gpib.h"
 #include <avr/eeprom.h>
 
-#define LED(s) {if(s) PORTF |= (1<<5); else PORTF &= ~(1<<5);}
+#define LED(s) {if(s) PORTD |= _BV(5); else PORTD &= ~_BV(5);}
 
 /** Contains the (usually static) capabilities of the TMC device. This table is requested by the
  *  host upon enumeration to give it information on what features of the Test and Measurement USB
@@ -349,14 +349,6 @@ static void TMC_SetInternalSerial(bool addGPIBAddress)
 	SetGlobalInterruptMask(CurrentGlobalInt);
 }
 
-void check_bootloaderEntry(void)
-{
-	if ( !(PINB & (1<<2)) ) /* check if PB2 is LOW*/
-	{
-		Jump_To_Bootloader();
-	}
-}
-
 void eeprom_update_if_changed(uint16_t addr, uint8_t value)
 {
 	uint8_t oldval;
@@ -376,10 +368,7 @@ int main(void)
 	//mcusr_mirror = MCUSR; 
 	MCUSR = 0; 
 	wdt_disable(); 
-	
-	PORTB |=  (1<<2); /* PB2 = PULLUP */
-	DDRB  &= ~(1<<2); /* PB2 = input*/
-	
+
 	SetupHardware();
 	
 	gpib_init();
@@ -398,7 +387,6 @@ int main(void)
 		LED(1);
 		_delay_ms(250);
 		LED(0);
-		check_bootloaderEntry();
 	}
 	
 	/* physically GPIB is connected, now check if any GPIB address is responsive */
@@ -415,7 +403,6 @@ int main(void)
 			wdt_enable(WDTO_250MS);	
 			while (1);
 		}
-		check_bootloaderEntry();
 	}; /* Identify the GPIB Address of the connected GPIB device */
 	
 	eeprom_busy_wait();
@@ -467,9 +454,7 @@ int main(void)
 	for (;;)
 	{
 		TMC_Task();
-		
-		check_bootloaderEntry();
-		
+
 		if (!gpib_is_connected()) /* check, if gpib is disconnected */
 		{ /* when we get here, reset the MCU and disconnect from USB ! It will reconnect once plugged in to GPIB again */
 			LED(0);
@@ -504,7 +489,7 @@ void SetupHardware(void)
 	TMC_SetInternalSerial(false);
 	
 	/* LED to output and turn on */
-	DDRF |= (1<<5);
+	DDRD |= _BV(5);
 	LED(1);
 	
 }

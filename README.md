@@ -1,3 +1,18 @@
+# UsbGpibArduinoProMicro
+A handy remix / abomination combining xyphro's UsbGpib firmware (FW) on Sparkfun's Arduino Pro Micro. For ease of use / extra facepalm, this uses the same pinout as Artag's AR488 Arduino Pro Micro adapter board.
+
+This is convenient if you already have some adapter boards compatible with Artag's pinout. Artag's adapter design is actually quite compact and looks smaller than xyphro's UsbGpib PCB. Another benefit / drawback is you don't have to / will miss out on soldering a QFN when using a ready built Arduino Pro Micro. This FW won't be as fast as xyphro's original UsbGpib implementation due to the extra bit reordering.
+
+To build the firmware, follow the instructions below. To flash your Arduino Pro Micro, you might need to build an adapter to go form your favourite programmer to the headers on the Arduino. For example, if you are using a USBasp, connect the GND, VCC, RST, SCK, MISO, MOSI lines of the programmer cable to the matching pins on the Arduino's header. Once you do that, the instructions below will work just fine. If you want your Arduino board to work with the Arduino IDE again after this, you will have to reprogram the Arduino bootloader which can be done from the Arduino IDE.
+
+Because all pins of the Arduino Pro Micro are used for GPIB, it would be risky to double the function of PB2 (MOSI) as the bootloader jumper. For this reason, check_bootloaderEntry has been removed. This means that you cannot use a pair of tweezers to run the bootloader and upgrade the FW. Instead, just flash the device with the main TestAndMeasurement.bin payload first. You don't have to flash the USB mass storage bootloader first. You can skip that (since it can't be used anyway), and go ahead and flash the main payload with avrdude directly.
+
+Original UsbGpib project: https://github.com/xyphro/UsbGpib
+
+Original AR488 project: https://github.com/Twilight-Logic/AR488
+
+xyphro's original README (with updates) follows below.
+
 # UsbGpib
 Versatile, cheap, portable and robust USB to GPIB converter (USBTMC class based).
 
@@ -91,7 +106,7 @@ I printed so far 15 housings, without a single fail.
 ## Source code
 
 The source code of the Boot loader (slightly modified LUFA MassStorage Boot loader) and the main USBGPIB converter are located in the "SW" subdirectory.
-At the time of publication LUFA 170418 release was used, with GCC as compiler.
+At the time of writing, LUFA 210130 release was used, with avr-gcc 5.4.0 as compiler.
 
 ## Binaries
 
@@ -104,8 +119,10 @@ For initial programming an AVR ISP adapter is needed to program the "Bootloader.
 It is very important, that the Fuses of the AVR are programmed.
 
 Here an example how to program the bootloader using avrdude (using usbasp programmer):
-avrdude -c usbasp -p m32u4 -e -Ulock:w:0x3F:m -Uefuse:w:0xcb:m -Uhfuse:w:0xd8:m -Ulfuse:w:0xff:m
-avrdude -c usbasp -p m32u4 -U flash:w:BootLoader.hex
+
+`avrdude -c usbasp -p m32u4 -e -Ulock:w:0x3F:m -Uefuse:w:0xcb:m -Uhfuse:w:0xd8:m -Ulfuse:w:0xff:m`
+
+`avrdude -c usbasp -p m32u4 -U flash:w:BootLoader.hex`
 
 After programming the file, disconnect and connect the device and a USB drive will show up. Copy the TestAndMeasurement.bin file to this USB drive - ideally using the command line. Example: `copy TestAndMeasurement.bin F:\FLASH.BIN`.
 On Linux, there is a bug with the LUFA mass storage that means it is required to use `dd if=TestAndMeasurement.bin of=/mnt/FLASH.BIN bs=512 conv=notrunc oflag=direct,sync`.

@@ -6,28 +6,28 @@
 #include <avr/interrupt.h>
 
 
-#define ATN_LOW   DDRF |=  (1<<6)
-#define ATN_HIGH  DDRF &= ~(1<<6)
-#define NDAC_LOW  DDRC |=  (1<<7)
-#define NDAC_HIGH DDRC &= ~(1<<7)
-#define NRFD_LOW  DDRC |=  (1<<6)
-#define NRFD_HIGH DDRC &= ~(1<<6)
-#define DAV_LOW   DDRB |=  (1<<6)
-#define DAV_HIGH  DDRB &= ~(1<<6)
-#define EOI_LOW   DDRB |=  (1<<4)
-#define EOI_HIGH  DDRB &= ~(1<<4)
-#define REN_LOW   DDRB |=  (1<<5)
-#define REN_HIGH  DDRB &= ~(1<<5)
-#define IFC_LOW   DDRE |=  (1<<2)
-#define IFC_HIGH  DDRE &= ~(1<<2)
+#define ATN_LOW   DDRD |=  _BV(1);
+#define ATN_HIGH  DDRD &= ~_BV(1);
+#define NDAC_LOW  DDRF |=  _BV(4);
+#define NDAC_HIGH DDRF &= ~_BV(4);
+#define NRFD_LOW  DDRF |=  _BV(5);
+#define NRFD_HIGH DDRF &= ~_BV(5);
+#define DAV_LOW   DDRF |=  _BV(6);
+#define DAV_HIGH  DDRF &= ~_BV(6);
+#define EOI_LOW   DDRF |=  _BV(7);
+#define EOI_HIGH  DDRF &= ~_BV(7);
+#define REN_LOW   DDRC |=  _BV(6);
+#define REN_HIGH  DDRC &= ~_BV(6);
+#define IFC_LOW   DDRD |=  _BV(4);
+#define IFC_HIGH  DDRD &= ~_BV(4);
 
 
 
-#define DAV_STATE  (PINB & (1<<6))
-#define NDAC_STATE (PINC & (1<<7))
-#define NRFD_STATE (PINC & (1<<6))
-#define ATN_STATE  (PINF & (1<<6))
-#define EOI_STATE  (PINB & (1<<4))
+#define DAV_STATE  (PINF & _BV(6))
+#define NDAC_STATE (PINF & _BV(4))
+#define NRFD_STATE (PINF & _BV(5))
+#define ATN_STATE  (PIND & _BV(1))
+#define EOI_STATE  (PINF & _BV(7))
 
 #define GPIB_DEVICE_CONNECTSTATE_UNKNOWN      (0)
 #define GPIB_DEVICE_CONNECTSTATE_DISCONNECTED (1)
@@ -58,12 +58,15 @@ static bool gpib_tx(uint8_t dat, bool iscommand, gpibtimeout_t ptimeoutfunc)
 	NRFD_HIGH;
 	NDAC_HIGH;  /* they should be already high, but let's enforce it */
 	
-	if (iscommand)
+	if (iscommand) {
 		ATN_LOW;
-	else
+	} else {
 		ATN_HIGH;
+	}
 
-	DDRD = dat;   /* set Data to data bus */
+	/* set Data to data bus */
+	DDRD = (DDRD & 0b01111110) | (dat & 0b10000001);
+	DDRB = (DDRB & 0b10000001) | (dat & 0b01111110);
 	_delay_us(1); /* wait for data to settle */
 		
 	/* wait until ready for data acceptance (NRFD=H, NDAC=L)*/
@@ -84,7 +87,9 @@ static bool gpib_tx(uint8_t dat, bool iscommand, gpibtimeout_t ptimeoutfunc)
 		DAV_HIGH; 
 	}
 	
-	DDRD = 0x00; /* release data bus */
+	/* release data bus */
+	DDRD &= 0b01111110;
+	DDRB &= 0b10000001;
 	ATN_HIGH;	 
 	
 	if (timedout)
@@ -296,19 +301,18 @@ ISR (TIMER0_OVF_vect)
 
 void gpib_init(void)
 {
-// PB5 = REN
-	DDRD  = 0x00;
-	PORTD = 0x00;
-	PORTB &= ~((1<<4) | (1<<5) | (1<<6));
-	DDRB  &= ~((1<<4) | (1<<5) | (1<<6));
-	PORTC &= ~((1<<6) | (1<<7));
-	DDRC  &= ~((1<<6) | (1<<7));
-	PORTE &= ~(1<<2);
-	DDRE  &= ~(1<<2);
-	PORTF &= ~((1<<6) | (1<<7));
-	DDRF  &= ~((1<<6) | (1<<7));
-	
-	DDRB |= (1<<5); /* remote enable */
+	DDRD  &= 0b01111110;
+	PORTD &= 0b01111110;
+	DDRB  &= 0b10000001;
+	PORTB &= 0b10000001;
+	PORTC &= ~_BV(6);
+	DDRC  &= ~_BV(6);
+	PORTD &= ~(_BV(1) | _BV(4));
+	DDRD  &= ~(_BV(1) | _BV(4));
+	PORTF &= ~(_BV(4) | _BV(5) | _BV(6) | _BV(7));
+	DDRF  &= ~(_BV(4) | _BV(5) | _BV(6) | _BV(7));
+
+	REN_LOW; /* remote enable */
 
 	s_gpib_transaction_active = false;
 	s_gpib_disconnect_counter = 0;
@@ -370,7 +374,8 @@ uint8_t gpib_readdat(bool *pEoi, bool *ptimedout, gpibtimeout_t ptimeoutfunc)
 	if (!timedout)
 	{
 		NRFD_LOW;
-		c = ~PIND;
+		c = (PIND & 0b10000001) | (PINB & 0b01111110);
+		c = ~c;
 		eoi = (EOI_STATE == 0) ;
 		NDAC_HIGH;
 		
